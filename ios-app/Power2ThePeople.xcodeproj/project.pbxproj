@@ -34,22 +34,9 @@
 		A64C069B2F25E1CF00C73210 /* Power2ThePeopleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Power2ThePeopleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A64C06B42F25E52F00C73210 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = A64C06802F25E1CD00C73210 /* Power2ThePeople */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A64C06832F25E1CD00C73210 /* Power2ThePeople */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A64C06B42F25E52F00C73210 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */,
-			);
 			path = Power2ThePeople;
 			sourceTree = "<group>";
 		};
