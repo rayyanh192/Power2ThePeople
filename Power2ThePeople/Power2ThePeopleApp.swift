@@ -1,17 +1,24 @@
-//
-//  Power2ThePeopleApp.swift
-//  Power2ThePeople
-//
-//  Created by Abhinav Ala on 1/24/26.
-//
-
 import SwiftUI
+import MWDATCore
 
 @main
 struct Power2ThePeopleApp: App {
+    
+    @StateObject private var wearablesManager = WearablesManager()
+    
+    init() {
+        WearablesManager.configureWearablesOnce()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(wearablesManager)
+                .onOpenURL { url in
+                    Task {
+                        await wearablesManager.handleWearablesCallback(url: url)
+                    }
+                }
         }
     }
 }

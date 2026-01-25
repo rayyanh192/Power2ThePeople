@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A64C06B02F25E38900C73210 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = A64C06AF2F25E38900C73210 /* MWDATCamera */; };
+		A64C06B22F25E38900C73210 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = A64C06B12F25E38900C73210 /* MWDATCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A64C06922F25E1CF00C73210 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +34,22 @@
 		A64C069B2F25E1CF00C73210 /* Power2ThePeopleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Power2ThePeopleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A64C06B42F25E52F00C73210 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A64C06802F25E1CD00C73210 /* Power2ThePeople */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A64C06832F25E1CD00C73210 /* Power2ThePeople */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A64C06B42F25E52F00C73210 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */,
+			);
 			path = Power2ThePeople;
 			sourceTree = "<group>";
 		};
@@ -52,6 +70,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A64C06B02F25E38900C73210 /* MWDATCamera in Frameworks */,
+				A64C06B22F25E38900C73210 /* MWDATCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +132,8 @@
 			);
 			name = Power2ThePeople;
 			packageProductDependencies = (
+				A64C06AF2F25E38900C73210 /* MWDATCamera */,
+				A64C06B12F25E38900C73210 /* MWDATCore */,
 			);
 			productName = Power2ThePeople;
 			productReference = A64C06812F25E1CD00C73210 /* Power2ThePeople.app */;
@@ -195,6 +217,9 @@
 			);
 			mainGroup = A64C06782F25E1CD00C73210;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A64C06AE2F25E38900C73210 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A64C06822F25E1CD00C73210 /* Products */;
 			projectDirPath = "";
@@ -396,8 +421,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Power2ThePeople/Preview Content\"";
+				DEVELOPMENT_TEAM = AVHWUZSA3G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Power2ThePeople/Info.plist;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Needed to connect to Meta Wearables";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Needed to record audio for transcription";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Needed for live speech-to-text transcription";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -424,8 +454,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Power2ThePeople/Preview Content\"";
+				DEVELOPMENT_TEAM = AVHWUZSA3G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Power2ThePeople/Info.plist;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Needed to connect to Meta Wearables";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Needed to record audio for transcription";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Needed for live speech-to-text transcription";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -552,6 +587,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A64C06AE2F25E38900C73210 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A64C06AF2F25E38900C73210 /* MWDATCamera */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A64C06AE2F25E38900C73210 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCamera;
+		};
+		A64C06B12F25E38900C73210 /* MWDATCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A64C06AE2F25E38900C73210 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A64C06792F25E1CD00C73210 /* Project object */;
 }
