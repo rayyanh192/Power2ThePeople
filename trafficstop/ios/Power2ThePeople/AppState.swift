@@ -11,7 +11,7 @@ import Combine
 @MainActor
 final class AppState: ObservableObject {
     // DGX endpoint (Tailscale IP or MagicDNS)
-    @Published var dgxBaseURL: String = "http://100.0.0.0:8000" // change later
+    @Published var dgxBaseURL: String = "http://promaxgb10-8528.tail3889eb.ts.net:8000"
     
     // Runtime state
     @Published var isRunning: Bool = false

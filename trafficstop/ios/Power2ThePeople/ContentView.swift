@@ -16,6 +16,11 @@ struct ContentView: View {
     @State private var readyJPEGBytes: Int = 0
     @State private var lastTriggerTime: Date? = nil
     
+    // NEW: DGX integration state
+    @State private var pendingTranscript: String? = nil  // Waiting for snapshot
+    @State private var dgxResponse: String = ""          // Advice from DGX
+    @State private var isProcessing: Bool = false        // Loading indicator
+    @State private var serverConnected: Bool? = nil      // Health check result
     
     var body: some View {
         NavigationView {
@@ -35,6 +40,47 @@ struct ContentView: View {
                             .background(.ultraThinMaterial)
                             .cornerRadius(10)
                             .padding(12)
+                    }
+                    
+                    // NEW: DGX Response box (prominent placement)
+                    GroupBox(label: Label("Legal Advice", systemImage: "scale.3d")) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            // Connection status
+                            HStack {
+                                Circle()
+                                    .fill(serverConnected == true ? Color.green : (serverConnected == false ? Color.red : Color.gray))
+                                    .frame(width: 8, height: 8)
+                                Text(serverConnected == true ? "Server connected" : (serverConnected == false ? "Server offline" : "Checking..."))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Button("Retry") {
+                                    checkServerHealth()
+                                }
+                                .font(.caption)
+                            }
+                            
+                            Divider()
+                            
+                            if isProcessing {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                    Text("Analyzing scene...")
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 8)
+                            } else if dgxResponse.isEmpty {
+                                Text("Waiting for first trigger...\n\nSpeak, then pause for 1.5s to get advice.")
+                                    .foregroundColor(.secondary)
+                                    .padding(.vertical, 8)
+                            } else {
+                                Text(dgxResponse)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(10)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(10)
+                            }
+                        }
                     }
                     
                     GroupBox(label: Text("DGX Endpoint (Tailscale)")) {
@@ -150,7 +196,7 @@ struct ContentView: View {
                     
                     GroupBox(label: Text("VAD (1.5s silence trigger)")) {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("VAD status: \(vad.status) | level: \(vad.level)")
+                            Text("VAD status: \(vad.status) | level: \(String(format: "%.4f", vad.level))")
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
 
@@ -209,6 +255,10 @@ struct ContentView: View {
                 .navigationTitle("Traffic Stop Assist")
             }
             .onAppear {
+                // Check server health on launch
+                checkServerHealth()
+                
+                // Set up VAD trigger
                 vad.onSilenceTrigger = {
                     // 1) Freeze transcript chunk
                     let chunk = speech.commitChunk()
@@ -217,12 +267,50 @@ struct ContentView: View {
                     readyTranscript = chunk
                     lastTriggerTime = Date()
 
-                    // 2) Snapshot
+                    // 2) Mark that we're waiting for a snapshot
+                    pendingTranscript = chunk
+
+                    // 3) Request snapshot
                     camera.takeSnapshot()
 
-                    // 3) Update status
-                    state.status = "Triggered: froze transcript + snapshot requested"
+                    // 4) Update status
+                    state.status = "Triggered: capturing snapshot..."
                 }
+            }
+            // NEW: Watch for snapshot completion, then send to DGX
+            .onChange(of: camera.lastSnapshotJPEG) { newData in
+                guard let transcript = pendingTranscript,
+                      let jpegData = newData,
+                      let image = UIImage(data: jpegData) else { return }
+                
+                // Clear pending so we don't double-send
+                pendingTranscript = nil
+                isProcessing = true
+                state.status = "Sending to DGX..."
+
+                DGXService.shared.sendToBackend(transcript: transcript, image: image) { result in
+                    DispatchQueue.main.async {
+                        isProcessing = false
+                        switch result {
+                        case .success(let advice):
+                            dgxResponse = advice
+                            state.status = "✅ Got advice"
+                        case .failure(let error):
+                            dgxResponse = "⚠️ \(error.localizedDescription)"
+                            state.status = "❌ \(error.localizedDescription)"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // NEW: Health check function
+    private func checkServerHealth() {
+        serverConnected = nil
+        DGXService.shared.checkHealth { isHealthy in
+            DispatchQueue.main.async {
+                serverConnected = isHealthy
             }
         }
     }

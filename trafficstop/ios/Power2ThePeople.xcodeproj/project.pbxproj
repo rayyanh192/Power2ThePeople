@@ -10,9 +10,22 @@
 		673CA7F12F26397800B293B8 /* Power2ThePeople.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Power2ThePeople.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		673CA8332F2689C600B293B8 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 673CA7F02F26397800B293B8 /* Power2ThePeople */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		673CA7F32F26397800B293B8 /* Power2ThePeople */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				673CA8332F2689C600B293B8 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */,
+			);
 			path = Power2ThePeople;
 			sourceTree = "<group>";
 		};
@@ -254,6 +267,7 @@
 				DEVELOPMENT_TEAM = AVHWUZSA3G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Power2ThePeople/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Need camera to capture a snapshot for scene analysis.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need microphone to detect speech and create transcript chunks.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Need speech recognition to transcribe spoken audio on-device.";
@@ -289,6 +303,7 @@
 				DEVELOPMENT_TEAM = AVHWUZSA3G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Power2ThePeople/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Need camera to capture a snapshot for scene analysis.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need microphone to detect speech and create transcript chunks.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Need speech recognition to transcribe spoken audio on-device.";
