@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer
 import faiss
 import json
@@ -10,12 +11,20 @@ class TrafficStopRAG:
     def __init__(self, data_dir: str = "Data"):
         """
         Initialize the RAG system for traffic stop rights.
-        
+
         Args:
             data_dir: Directory containing all the data files
         """
         self.data_dir = data_dir
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')  # Fast, good embeddings
+        # self.model = SentenceTransformer(
+        #     'nvidia/NV-Embed-v2',
+        #     trust_remote_code=True,
+        #     device='cuda',
+        #     model_kwargs={
+        #         'torch_dtype': torch.float32,  # Full precision, no quantization
+        #     }
+        # )
+        self.model = SentenceTransformer('BAAI/bge-large-en-v1.5', device='cpu')
         self.index = None
         self.documents = []
         self.metadata = []
