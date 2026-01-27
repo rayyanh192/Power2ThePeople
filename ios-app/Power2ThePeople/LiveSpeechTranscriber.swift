@@ -35,7 +35,7 @@ final class LiveSpeechTranscriber: ObservableObject {
     }
     
     func start() async {
-        transcript = ""
+        transcript = ""  // Clear only when starting NEW recording session
         lastErrorText = ""
         statusText = "requesting permissions…"
         
@@ -100,19 +100,29 @@ final class LiveSpeechTranscriber: ObservableObject {
                     self.transcript = result.bestTranscription.formattedString
                 }
             }
-            if error != nil {
-                self.stop()
+            // Do NOT call stop() on error - let user explicitly stop
+            // Do NOT clear transcript on task completion
+            if let error = error {
+                print("[Speech] Recognition error: \(error)")
+                // Just log it, don't stop or clear
             }
         }
     }
     
     func stop() {
-        savedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Save current transcript BEFORE stopping anything
+        let currentText = transcript
+        savedTranscript = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         
+        print("[Speech] Stop called - current transcript: '\(currentText)'")
+        
+        // Stop audio capture
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         request?.endAudio()
         request = nil
+        
+        // Cancel the recognition task (this might trigger completion callback)
         task?.cancel()
         task = nil
         
@@ -123,6 +133,10 @@ final class LiveSpeechTranscriber: ObservableObject {
         
         isRunning = false
         statusText = "stopped"
+        
+        // CRITICAL: Do NOT modify transcript here
+        // Print confirmation
+        print("[Speech] Stopped. Transcript still contains: '\(transcript)'")
     }
     
     private func requestMicrophonePermission() async {

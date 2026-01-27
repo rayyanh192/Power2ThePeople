@@ -417,146 +417,310 @@ final class WearablesManager: ObservableObject {
 // MARK: - ContentView
 struct ContentView: View {
     @EnvironmentObject private var manager: WearablesManager
+    @StateObject private var speechTranscriber = LiveSpeechTranscriber()
     @State private var showHelp = false
+    @State private var isStatusExpanded = false
+    @State private var isSpeechExpanded = false
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Status Card
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Connection Status")
-                            .font(.headline)
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Collapsible Status Card
+                        VStack(alignment: .leading, spacing: 0) {
+                            Button(action: { withAnimation { isStatusExpanded.toggle() } }) {
+                                HStack {
+                                    Text("Connection Status")
+                                        .font(.headline)
+                                    Spacer()
+                                    Image(systemName: isStatusExpanded ? "chevron.up" : "chevron.down")
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .contentShape(Rectangle())
+                            }
+                            .foregroundColor(.primary)
+                            
+                            if isStatusExpanded {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    StatusRow(title: "📱 Registration", value: manager.registrationState)
+                                    StatusRow(title: "👓 Devices Found", value: manager.deviceCount)
+                                    StatusRow(title: "📷 Camera Access", value: manager.cameraPermission)
+                                    StatusRow(title: "🎥 Streaming", value: manager.isStreaming ? "Active" : "Inactive")
+                                    
+                                    if let error = manager.errorMessage {
+                                        Text(error)
+                                            .foregroundColor(.red)
+                                            .font(.caption)
+                                            .padding(8)
+                                            .background(Color.red.opacity(0.1))
+                                            .cornerRadius(8)
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    // Help Button in dropdown
+                                    Button(action: { showHelp = true }) {
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                            Text("Need Help?")
+                                            Spacer()
+                                        }
+                                        .foregroundColor(.primary)
+                                    }
+                                    .padding(.top, 4)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                            }
+                        }
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
                         
-                        StatusRow(title: "📱 Registration", value: manager.registrationState)
-                        StatusRow(title: "👓 Devices Found", value: manager.deviceCount)
-                        StatusRow(title: "📷 Camera Access", value: manager.cameraPermission)
-                        StatusRow(title: "🎥 Streaming", value: manager.isStreaming ? "Active" : "Inactive")
+                        // Camera Feed
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Camera Feed")
+                                .font(.headline)
+
+                            if let image = manager.latestFrameImage {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(height: 200)
+                                    .cornerRadius(12)
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color(.systemGray5))
+                                        .frame(height: 200)
+
+                                    VStack(spacing: 12) {
+                                        if manager.isStreaming {
+                                            ProgressView()
+                                                .scaleEffect(1.5)
+                                            Text("Waiting for frames...")
+                                                .foregroundColor(.gray)
+                                            Text("Keep glasses awake")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        } else {
+                                            Image(systemName: "camera.viewfinder")
+                                                .font(.largeTitle)
+                                                .foregroundColor(.gray)
+                                            Text("No feed available")
+                                                .foregroundColor(.gray)
+                                            Text("Tap Start Stream")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         
-                        if let error = manager.errorMessage {
-                            Text(error)
-                                .foregroundColor(.red)
-                                .font(.caption)
-                                .padding(8)
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(8)
+                        // Control Buttons
+                        VStack(spacing: 15) {
+                            // Registration Buttons
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Step 1: Registration")
+                                    .font(.subheadline)
+                                    .bold()
+                                
+                                HStack(spacing: 10) {
+                                    Button(action: { manager.register() }) {
+                                        Label("Register with Meta", systemImage: "link")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(manager.registrationState.contains("registered"))
+                                    
+                                    Button(action: { manager.unregister() }) {
+                                        Label("Unregister", systemImage: "link.slash")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+                            }
+                            
+                            // Streaming Buttons
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Step 2: Streaming")
+                                    .font(.subheadline)
+                                    .bold()
+                                
+                                HStack(spacing: 10) {
+                                    Button(action: {
+                                        Task {
+                                            manager.resetReconnectAttempts()
+                                            await manager.startStream()
+                                        }
+                                    }) {
+                                        Label("Start Stream", systemImage: "play.circle")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(manager.isStreaming || manager.deviceCount == "0")
+                                    
+                                    Button(action: {
+                                        Task { await manager.stopStream() }
+                                    }) {
+                                        Label("Stop Stream", systemImage: "stop.circle")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(!manager.isStreaming)
+                                }
+                            }
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                    
-                    // Camera Feed
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Camera Feed")
-                            .font(.headline)
-
-                        if let image = manager.latestFrameImage {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 250)
-                                .cornerRadius(12)
-                        } else {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemGray5))
-                                    .frame(height: 250)
-
-                                VStack(spacing: 12) {
-                                    if manager.isStreaming {
-                                        ProgressView()
-                                            .scaleEffect(1.5)
-                                        Text("Waiting for frames...")
-                                            .foregroundColor(.gray)
-                                        Text("Keep glasses awake")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    } else {
-                                        Image(systemName: "camera.viewfinder")
-                                            .font(.largeTitle)
-                                            .foregroundColor(.gray)
-                                        Text("No feed available")
-                                            .foregroundColor(.gray)
-                                        Text("Tap Start Stream")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Control Buttons
-                    VStack(spacing: 15) {
-                        // Registration Buttons
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Step 1: Registration")
-                                .font(.subheadline)
-                                .bold()
-                            
-                            HStack(spacing: 10) {
-                                Button(action: { manager.register() }) {
-                                    Label("Register with Meta", systemImage: "link")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(manager.registrationState.contains("registered"))
-                                
-                                Button(action: { manager.unregister() }) {
-                                    Label("Unregister", systemImage: "link.slash")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        }
-                        
-                        // Streaming Buttons
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Step 2: Streaming")
-                                .font(.subheadline)
-                                .bold()
-                            
-                            HStack(spacing: 10) {
-                                Button(action: {
-                                    Task {
-                                        manager.resetReconnectAttempts()
-                                        await manager.startStream()
-                                    }
-                                }) {
-                                    Label("Start Stream", systemImage: "play.circle")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(manager.isStreaming || manager.deviceCount == "0")
-                                
-                                Button(action: {
-                                    Task { await manager.stopStream() }
-                                }) {
-                                    Label("Stop Stream", systemImage: "stop.circle")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(!manager.isStreaming)
-                            }
-                        }
-                    }
-                    
-                    // Help Button
-                    Button(action: { showHelp = true }) {
-                        HStack {
-                            Image(systemName: "questionmark.circle")
-                            Text("Need Help?")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Spacer()
                 }
-                .padding()
+                
+                Divider()
+                
+                // Speech-to-Text Section (Collapsible)
+                VStack(spacing: 0) {
+                    Button(action: { withAnimation { isSpeechExpanded.toggle() } }) {
+                        HStack {
+                            Text("Speech to Text")
+                                .font(.headline)
+                            Spacer()
+                            Image(systemName: isSpeechExpanded ? "chevron.up" : "chevron.down")
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundColor(.primary)
+                    
+                    if isSpeechExpanded {
+                        VStack(spacing: 12) {
+                            // Microphone Level Indicator
+                            VStack(spacing: 6) {
+                                HStack {
+                                    Image(systemName: "waveform")
+                                        .foregroundColor(.blue)
+                                    Text("Microphone Level")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text("\(Int(speechTranscriber.inputLevelDB)) dB")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .monospacedDigit()
+                                }
+                                
+                                // Audio Level Bar
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color(.systemGray5))
+                                        
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [.green, .yellow, .red]),
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: geometry.size.width * CGFloat(speechTranscriber.inputLevel))
+                                    }
+                                    .frame(height: 8)
+                                }
+                                .frame(height: 8)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 12)
+                            
+                            // Transcript Display
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Transcript")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                
+                                ScrollView {
+                                    TextEditor(text: $speechTranscriber.transcript)
+                                        .frame(minHeight: 100)
+                                        .padding(8)
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(8)
+                                        .disabled(true)
+                                }
+                                .frame(height: 120)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(8)
+                                .padding(.horizontal)
+                            }
+                            
+                            // Recording Controls
+                            VStack(spacing: 12) {
+                                HStack(spacing: 12) {
+                                    Button(action: {
+                                        Task {
+                                            await speechTranscriber.start()
+                                        }
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "mic.circle.fill")
+                                            Text("Start Recording")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(speechTranscriber.isRunning)
+                                    
+                                    Button(action: {
+                                        speechTranscriber.stop()
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "stop.circle.fill")
+                                            Text("Stop Recording")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(!speechTranscriber.isRunning)
+                                }
+                                
+                                Button(action: {
+                                    speechTranscriber.transcript = ""
+                                    speechTranscriber.savedTranscript = ""
+                                }) {
+                                    HStack {
+                                        Image(systemName: "trash.circle")
+                                        Text("Clear")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                
+                                // Status Text
+                                HStack {
+                                    if speechTranscriber.isRunning {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    }
+                                    Text(speechTranscriber.statusText)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 8)
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 12)
+                        }
+                        .background(Color(.systemGray6))
+                    }
+                }
+                .background(Color(.systemGray6))
             }
-            .navigationTitle("Meta Glasses Stream")
+            .navigationTitle("Power2ThePeople")
             .sheet(isPresented: $showHelp) {
                 HelpView()
             }
