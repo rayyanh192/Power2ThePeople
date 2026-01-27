@@ -72,9 +72,12 @@ final class LiveSpeechTranscriber: ObservableObject {
         request.shouldReportPartialResults = true
         
         let input = audioEngine.inputNode
-        let format = input.outputFormat(forBus: 0)
         
         input.removeTap(onBus: 0)
+        
+        // Get the format - it should not be nil for input node
+        let format = input.outputFormat(forBus: 0) ?? AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1)
+        
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             request.append(buffer)
             self?.updateInputLevel(buffer: buffer)

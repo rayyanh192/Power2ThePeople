@@ -580,11 +580,11 @@ struct ContentView: View {
                 
                 Divider()
                 
-                // Speech-to-Text Section (Collapsible)
+                // Audio Processing Section (Collapsible)
                 VStack(spacing: 0) {
                     Button(action: { withAnimation { isSpeechExpanded.toggle() } }) {
                         HStack {
-                            Text("Speech to Text")
+                            Text("Audio Processing")
                                 .font(.headline)
                             Spacer()
                             Image(systemName: isSpeechExpanded ? "chevron.up" : "chevron.down")
@@ -659,6 +659,12 @@ struct ContentView: View {
                             
                             // Recording Controls
                             VStack(spacing: 12) {
+                                Text("Capture Audio")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                
                                 HStack(spacing: 12) {
                                     Button(action: {
                                         Task {
@@ -686,6 +692,7 @@ struct ContentView: View {
                                     .buttonStyle(.bordered)
                                     .disabled(!speechTranscriber.isRunning)
                                 }
+                                .padding(.horizontal)
                                 
                                 Button(action: {
                                     speechTranscriber.transcript = ""
@@ -693,11 +700,12 @@ struct ContentView: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "trash.circle")
-                                        Text("Clear")
+                                        Text("Clear Transcript")
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.bordered)
+                                .padding(.horizontal)
                                 
                                 // Status Text
                                 HStack {
@@ -712,7 +720,73 @@ struct ContentView: View {
                                 }
                                 .padding(.horizontal, 8)
                             }
-                            .padding(.horizontal)
+                            
+                            Divider()
+                                .padding(.vertical, 8)
+                            
+                            // Playback Controls
+                            VStack(spacing: 12) {
+                                Text("Play Back Audio")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal)
+                                
+                                HStack(spacing: 12) {
+                                    Button(action: {
+                                        speechTranscriber.playPausePlayback()
+                                    }) {
+                                        HStack {
+                                            Image(systemName: speechTranscriber.isPlaybackPaused ? "play.circle.fill" : "pause.circle.fill")
+                                            Text(speechTranscriber.isPlayingBack && !speechTranscriber.isPlaybackPaused ? "Pause" : "Play")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(speechTranscriber.transcript.isEmpty && speechTranscriber.savedTranscript.isEmpty)
+                                    
+                                    Button(action: {
+                                        speechTranscriber.restartPlayback()
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "arrow.counterclockwise.circle.fill")
+                                            Text("Restart")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(speechTranscriber.transcript.isEmpty && speechTranscriber.savedTranscript.isEmpty)
+                                }
+                                .padding(.horizontal)
+                                
+                                Button(action: {
+                                    speechTranscriber.stopPlayback()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "stop.circle")
+                                        Text("Stop Playback")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(!speechTranscriber.isPlayingBack)
+                                .padding(.horizontal)
+                                
+                                // Playback Status
+                                HStack {
+                                    if speechTranscriber.isPlayingBack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text(speechTranscriber.isPlaybackPaused ? "Paused" : "Playing...")
+                                    } else {
+                                        Text("Ready to play")
+                                    }
+                                    Spacer()
+                                }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 8)
+                            }
                             .padding(.bottom, 12)
                         }
                         .background(Color(.systemGray6))
