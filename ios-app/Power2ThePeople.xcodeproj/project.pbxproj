@@ -34,9 +34,22 @@
 		A64C069B2F25E1CF00C73210 /* Power2ThePeopleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Power2ThePeopleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		111051262F25FA0700DE0D06 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A64C06802F25E1CD00C73210 /* Power2ThePeople */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A64C06832F25E1CD00C73210 /* Power2ThePeople */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				111051262F25FA0700DE0D06 /* Exceptions for "Power2ThePeople" folder in "Power2ThePeople" target */,
+			);
 			path = Power2ThePeople;
 			sourceTree = "<group>";
 		};
@@ -180,7 +193,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 1620;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					A64C06802F25E1CD00C73210 = {
 						CreatedOnToolsVersion = 16.2;
@@ -339,6 +352,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -395,6 +409,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -408,13 +423,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Power2ThePeople/Preview Content\"";
-				DEVELOPMENT_TEAM = AVHWUZSA3G;
+				DEVELOPMENT_TEAM = Z5Z57TS6M4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Power2ThePeople/Info.plist;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Needed to connect to Meta Wearables";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Needed to record audio for transcription";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Needed for live speech-to-text transcription";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app needs Bluetooth to connect to Meta smart glasses";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "This app needs Bluetooth to connect to Meta smart glasses";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to stream video from Meta smart glasses";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access for speech-to-text transcription";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -425,7 +441,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rayyan.Power2ThePeople;
+				PRODUCT_BUNDLE_IDENTIFIER = com.edrick.Power2ThePeople;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -441,13 +457,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Power2ThePeople/Preview Content\"";
-				DEVELOPMENT_TEAM = AVHWUZSA3G;
+				DEVELOPMENT_TEAM = Z5Z57TS6M4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Power2ThePeople/Info.plist;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Needed to connect to Meta Wearables";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Needed to record audio for transcription";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Needed for live speech-to-text transcription";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app needs Bluetooth to connect to Meta smart glasses";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "This app needs Bluetooth to connect to Meta smart glasses";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to stream video from Meta smart glasses";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access for speech-to-text transcription";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -458,7 +475,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rayyan.Power2ThePeople;
+				PRODUCT_BUNDLE_IDENTIFIER = com.edrick.Power2ThePeople;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

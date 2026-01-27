@@ -11,12 +11,14 @@ final class TextToSpeechPlayer: NSObject, ObservableObject, AVSpeechSynthesizerD
     
     private let synthesizer = AVSpeechSynthesizer()
     
+    private var routeChangeObserver: NSObjectProtocol?
+
     override init() {
         super.init()
         synthesizer.delegate = self
         refreshRouteLabel()
-        
-        NotificationCenter.default.addObserver(
+
+        routeChangeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
             queue: .main
@@ -24,6 +26,12 @@ final class TextToSpeechPlayer: NSObject, ObservableObject, AVSpeechSynthesizerD
             Task { @MainActor in
                 self?.refreshRouteLabel()
             }
+        }
+    }
+
+    deinit {
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
     

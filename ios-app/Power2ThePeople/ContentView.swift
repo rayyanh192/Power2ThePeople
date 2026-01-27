@@ -1,410 +1,695 @@
+//
+//  ContentView.swift
+//  Power2ThePeople
+//
+//  Created by Edrick Chang on 1/24/26.
+//
+
 import SwiftUI
 import UIKit
 import Combine
+import CoreImage
+import CoreMedia
+import AVFoundation
+
+// Meta Wearables Device Access Toolkit
 import MWDATCore
 import MWDATCamera
 
 @MainActor
 final class WearablesManager: ObservableObject {
-    
-    private static var didConfigure: Bool = false
-    
-    // MARK: - Published UI State
-    @Published var registrationStateText: String = "unknown"
-    @Published var deviceCountText: String = "0 devices"
-    @Published var cameraPermissionText: String = "unknown"
+
+    // MARK: - Published UI state
+    @Published var registrationState: String = "unknown"
+    @Published var deviceCount: String = "0"
+    @Published var cameraPermission: String = "unknown"
     @Published var isStreaming: Bool = false
-    @Published var deviceCount: Int = 0
-    @Published var lastErrorText: String? = nil
-    
+    @Published var errorMessage: String? = nil
     @Published var latestFrameImage: UIImage? = nil
-    @Published var lastPhotoCaptured: UIImage? = nil
-    
-    // MARK: - DAT Objects
-    private lazy var wearables: any WearablesInterface = {
-        WearablesManager.configureWearablesOnce()
-        return Wearables.shared
-    }()
-    
-    private var streamSession: StreamSession? = nil
-    private var stateToken: Any? = nil
-    private var frameToken: Any? = nil
-    private var photoToken: Any? = nil
-    
-    private var registrationTask: Task<Void, Never>? = nil
-    private var devicesTask: Task<Void, Never>? = nil
-    
+
+    private var wearables: (any WearablesInterface)?
+    private var streamSession: StreamSession?
+    private var observationTasks: [Task<Void, Never>] = []
+    private var isSimulator: Bool = false
+
+    // Store stream listener tokens to keep subscriptions alive
+    private var streamListeners: [Any] = []
+    private var reconnectAttempts: Int = 0
+    private let maxReconnectAttempts: Int = 5
+    private var isReconnecting: Bool = false
+    private var frameCount: Int = 0
+
     init() {
-        WearablesManager.configureWearablesOnce()
-    }
-    
-    // MARK: - Configure
-    static func configureWearablesOnce() {
-        // Skip in Xcode Preview/Simulator
-        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-            return
-        }
-        
         #if targetEnvironment(simulator)
-        return
+        isSimulator = true
+        print("[MWDAT] Running in simulator - Wearables not available")
         #else
-        if didConfigure { return }
-        didConfigure = true
-        
+        // Configure Wearables SDK first, then access shared instance
+        configureWearables()
+        #endif
+
+        // Start observing only if not in simulator
+        if !isSimulator {
+            startObserving()
+        }
+    }
+
+    private func configureWearables() {
         do {
             try Wearables.configure()
+            wearables = Wearables.shared
+            print("[MWDAT] SDK configured successfully")
         } catch {
-            print("Failed to configure Wearables SDK: \(error)")
+            print("[MWDAT] SDK configuration failed: \(error)")
+            errorMessage = "SDK failed to initialize: \(error.localizedDescription)"
         }
-        #endif
+    }
+
+    var isSDKInitialized: Bool {
+        return wearables != nil
     }
     
-    // MARK: - Registration
-    func startRegistration() {
+    private func startObserving() {
+        guard let wearables = wearables else {
+            print("[MWDAT] Cannot observe - wearables not initialized")
+            return
+        }
+
+        // Stop any existing observations
+        stopObserving()
+
+        // Task 1: Observe registration state
+        let registrationTask = Task {
+            for await state in wearables.registrationStateStream() {
+                await MainActor.run {
+                    self.registrationState = "\(state)"
+                    print("[MWDAT] Registration: \(state)")
+
+                    // When registered (state 3), clear errors and check devices
+                    if "\(state)".contains("3") || "\(state)".lowercased().contains("registered") {
+                        self.errorMessage = nil  // Clear any stale registration errors
+                        Task {
+                            // Wait 3 seconds for system to stabilize
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            await self.forceDeviceDiscovery()
+                        }
+                    }
+                }
+            }
+        }
+        observationTasks.append(registrationTask)
+
+        // Task 2: Observe devices
+        let devicesTask = Task {
+            for await devices in wearables.devicesStream() {
+                await MainActor.run {
+                    self.deviceCount = "\(devices.count)"
+                    print("[MWDAT] Devices: \(devices.count)")
+
+                    if devices.count > 0 {
+                        self.errorMessage = nil
+                        // Auto-request camera permission when device appears
+                        self.requestCameraPermissionIfNeeded()
+                    } else {
+                        self.errorMessage = "No glasses found. Make sure:\n1. Glasses are ON\n2. Paired with Meta AI app\n3. Bluetooth is ON"
+                    }
+                }
+            }
+        }
+        observationTasks.append(devicesTask)
+    }
+    
+    private func stopObserving() {
+        for task in observationTasks {
+            task.cancel()
+        }
+        observationTasks.removeAll()
+    }
+    
+    private func forceDeviceDiscovery() async {
+        guard let wearables = wearables else { return }
+
+        print("[MWDAT] Forcing device discovery...")
+
+        // Sometimes we need to manually trigger discovery
+        // Some SDK versions have a refresh method
+        let wearablesObject = wearables as AnyObject
+        let selector = NSSelectorFromString("refreshDevices")
+        if wearablesObject.responds(to: selector) {
+            _ = wearablesObject.perform(selector)
+            print("[MWDAT] Manual device refresh triggered")
+        }
+
+        // Also try to check devices through the stream
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+    }
+    
+    // MARK: - User Actions
+
+    func register() {
+        guard let wearables = wearables else {
+            // Don't overwrite existing error if SDK failed to configure
+            if errorMessage == nil || !errorMessage!.contains("SDK failed") {
+                errorMessage = "SDK not initialized. Check console for errors."
+            }
+            return
+        }
+
+        print("[MWDAT] Starting registration...")
+        errorMessage = nil
+
         do {
             try wearables.startRegistration()
         } catch {
-            print("startRegistration error: \(error)")
+            print("[MWDAT] Registration error: \(error)")
+            errorMessage = "Registration failed: \(error.localizedDescription)"
         }
     }
-    
-    func startUnregistration() {
+
+    func unregister() {
+        guard let wearables = wearables else { return }
+
+        print("[MWDAT] Starting unregistration...")
+
         do {
             try wearables.startUnregistration()
         } catch {
-            print("startUnregistration error: \(error)")
+            print("[MWDAT] Unregistration error: \(error)")
         }
     }
-    
-    func handleWearablesCallback(url: URL) async {
-        do {
-            _ = try await wearables.handleUrl(url)
-        } catch {
-            print("handleUrl error: \(error)")
-        }
-    }
-    
-    // MARK: - Device Discovery Streams
-    func startObservingWearablesStreams() {
-        // Listen to registration state changes
-        registrationTask?.cancel()
-        registrationTask = Task {
-            for await state in wearables.registrationStateStream() {
-                await MainActor.run {
-                    self.registrationStateText = "\(state)"
-                    self.lastErrorText = nil
-                }
-            }
-        }
-        
-        // Listen to device discovery
-        devicesTask?.cancel()
-        devicesTask = Task {
-            for await devices in wearables.devicesStream() {
-                await MainActor.run {
-                    self.deviceCount = devices.count
-                    self.deviceCountText = "\(devices.count) devices"
-                    self.lastErrorText = nil
-                }
-            }
-        }
-    }
-    
-    func stopObservingWearablesStreams() {
-        registrationTask?.cancel()
-        devicesTask?.cancel()
-        registrationTask = nil
-        devicesTask = nil
-    }
-    
-    // MARK: - Camera Permissions
-    func checkCameraPermission() {
-        Task { [weak self] in
-            guard let self else { return }
-            guard self.deviceCount > 0 else {
-                await MainActor.run {
-                    self.cameraPermissionText = "blocked (0 devices)"
-                    self.lastErrorText = "No glasses discovered. Register first."
-                }
-                return
-            }
+
+    func requestCameraPermissionIfNeeded() {
+        guard let wearables = wearables else { return }
+
+        Task {
             do {
-                let status = try await self.wearables.checkPermissionStatus(.camera)
+                let status = try await wearables.checkPermissionStatus(.camera)
                 await MainActor.run {
-                    self.cameraPermissionText = "\(status)"
+                    self.cameraPermission = "\(status)"
+                }
+
+                // If not granted, request it
+                if !"\(status)".lowercased().contains("granted") {
+                    let newStatus = try await wearables.requestPermission(.camera)
+                    await MainActor.run {
+                        self.cameraPermission = "\(newStatus)"
+                    }
                 }
             } catch {
-                await MainActor.run {
-                    self.cameraPermissionText = "error"
-                    self.lastErrorText = "checkPermissionStatus failed: \(error)"
-                }
+                print("[MWDAT] Permission error: \(error)")
             }
         }
     }
     
-    func requestCameraPermission() {
-        Task { [weak self] in
-            guard let self else { return }
-            guard self.deviceCount > 0 else {
-                await MainActor.run {
-                    self.cameraPermissionText = "blocked (0 devices)"
-                    self.lastErrorText = "Cannot request permission until Devices = 1+"
-                }
-                return
-            }
-            do {
-                let status = try await self.wearables.requestPermission(.camera)
-                await MainActor.run {
-                    self.cameraPermissionText = "\(status)"
-                }
-            } catch {
-                await MainActor.run {
-                    self.cameraPermissionText = "error"
-                    self.lastErrorText = "requestPermission failed: \(error)"
-                }
-            }
-        }
-    }
-    
-    // MARK: - Video Streaming
-    func startStreaming() async {
-        await stopStreaming()
-        
-        guard deviceCount > 0 else {
-            await MainActor.run {
-                self.isStreaming = false
-                self.lastErrorText = "Cannot stream: no glasses discovered (Devices = 0)"
-            }
+    func startStream() async {
+        guard let wearables = wearables else {
+            errorMessage = "SDK not initialized"
             return
         }
-        
+
+        await stopStream()
+
+        guard Int(deviceCount) ?? 0 > 0 else {
+            errorMessage = "Cannot stream: No devices connected"
+            return
+        }
+
+        // Check and request camera permission (but don't block if check fails)
+        do {
+            let status = try await wearables.checkPermissionStatus(.camera)
+            print("[MWDAT] Camera permission status: \(status)")
+            cameraPermission = "\(status)"
+
+            if "\(status)".lowercased().contains("denied") {
+                // Permission explicitly denied - this is blocking
+                errorMessage = "Camera permission denied. Open Meta AI app → Settings → Connected Devices → Your app → Grant camera access"
+                return
+            }
+
+            if !"\(status)".lowercased().contains("granted") {
+                print("[MWDAT] Requesting camera permission...")
+                let newStatus = try await wearables.requestPermission(.camera)
+                print("[MWDAT] New camera permission status: \(newStatus)")
+                cameraPermission = "\(newStatus)"
+
+                // If still not granted after request, try streaming anyway
+                // The SDK might prompt the user during stream start
+                if "\(newStatus)".lowercased().contains("denied") {
+                    errorMessage = "Camera permission denied. Please approve in Meta AI app."
+                    return
+                }
+            }
+        } catch {
+            // Permission check failed - try streaming anyway
+            // The SDK may handle permissions internally
+            print("[MWDAT] Permission check error (proceeding anyway): \(error)")
+            cameraPermission = "checking..."
+        }
+
+        print("[MWDAT] Starting stream...")
+        errorMessage = nil
+        frameCount = 0
+
+        // Keep screen awake during streaming
+        UIApplication.shared.isIdleTimerDisabled = true
+
+        // Configure audio session to prevent Bluetooth disconnects (from SpecBridge)
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .mixWithOthers])
+            try audioSession.setActive(true)
+            print("[MWDAT] Audio session configured for Bluetooth stability")
+        } catch {
+            print("[MWDAT] Audio session setup error: \(error)")
+        }
+
+        // Longer delay to let connection stabilize and "prime" the encoder
+        if !isReconnecting {
+            print("[MWDAT] Waiting for connection to stabilize (priming)...")
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+
         let deviceSelector = AutoDeviceSelector(wearables: wearables)
+        // Use lower settings for more stable connection
+        // Valid frameRate values: 2, 7, 15, 24, 30
+        // Lower resolution reduces Bluetooth bandwidth pressure
         let config = StreamSessionConfig(
             videoCodec: VideoCodec.raw,
             resolution: StreamingResolution.low,
-            frameRate: 24
+            frameRate: 15
         )
-        
+
         let session = StreamSession(streamSessionConfig: config, deviceSelector: deviceSelector)
         self.streamSession = session
-        
-        // Listen to session state
-        stateToken = session.statePublisher.listen { [weak self] state in
-            Task { @MainActor in
-                self?.isStreaming = (state == .streaming)
-            }
-        }
-        
-        // Listen to video frames
-        frameToken = session.videoFramePublisher.listen { [weak self] frame in
-            guard let image = frame.makeUIImage() else { return }
-            Task { @MainActor in
-                self?.latestFrameImage = image
-            }
-        }
-        
-        // Listen to photo captures
-        photoToken = session.photoDataPublisher.listen { [weak self] photoData in
-            if let img = UIImage(data: photoData.data) {
-                Task { @MainActor in
-                    self?.lastPhotoCaptured = img
+
+        // Clear previous listeners
+        streamListeners.removeAll()
+
+        // Listen for frames - MUST store the token to keep subscription alive
+        let frameListener = session.videoFramePublisher.listen { [weak self] frame in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.frameCount += 1
+
+                // Log every frame initially, then every 30th frame
+                if self.frameCount <= 5 || self.frameCount % 30 == 0 {
+                    print("[MWDAT] 📹 Frame #\(self.frameCount) received!")
+                }
+
+                if let image = frame.makeUIImage() {
+                    self.latestFrameImage = image
+                } else {
+                    print("[MWDAT] ⚠️ Frame #\(self.frameCount) - makeUIImage() returned nil")
                 }
             }
         }
-        
+        streamListeners.append(frameListener)
+
+        // Listen for state changes - MUST store the token
+        let stateListener = session.statePublisher.listen { [weak self] state in
+            Task { @MainActor [weak self] in
+                print("[MWDAT] Stream state changed: \(state)")
+
+                switch state {
+                case .streaming:
+                    self?.isStreaming = true
+                    self?.reconnectAttempts = 0
+                    self?.isReconnecting = false
+                    self?.errorMessage = nil
+                    print("[MWDAT] ✅ Streaming active!")
+
+                case .waitingForDevice:
+                    self?.isStreaming = false
+                    self?.errorMessage = "Waiting for glasses... Keep them awake"
+
+                case .stopped:
+                    self?.isStreaming = false
+                    print("[MWDAT] Stream stopped")
+
+                case .stopping:
+                    self?.isStreaming = false
+
+                default:
+                    self?.isStreaming = false
+                    // Handle stream errors
+                    if "\(state)".lowercased().contains("error") || "\(state)".lowercased().contains("failed") {
+                        self?.errorMessage = "Stream issue: \(state)"
+                    }
+                }
+            }
+        }
+        streamListeners.append(stateListener)
+
+        // Listen for errors - MUST store the token
+        let errorListener = session.errorPublisher.listen { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                print("[MWDAT] Stream error: \(error)")
+
+                // Don't reconnect if already reconnecting
+                guard !self.isReconnecting else {
+                    print("[MWDAT] Already reconnecting, skipping...")
+                    return
+                }
+
+                if self.reconnectAttempts < self.maxReconnectAttempts {
+                    self.isReconnecting = true
+                    self.reconnectAttempts += 1
+                    self.errorMessage = "Stream error - Reconnecting (\(self.reconnectAttempts)/\(self.maxReconnectAttempts))..."
+                    print("[MWDAT] Attempting reconnect \(self.reconnectAttempts)/\(self.maxReconnectAttempts)...")
+
+                    // Longer delay between reconnects to let glasses recover
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await self.startStream()
+                    self.isReconnecting = false
+                } else {
+                    self.errorMessage = "Stream failed after \(self.maxReconnectAttempts) attempts. Tap Start Stream to try again."
+                    self.reconnectAttempts = 0
+                    self.isReconnecting = false
+                }
+            }
+        }
+        streamListeners.append(errorListener)
+
         await session.start()
+        print("[MWDAT] Stream start() called")
     }
     
-    func stopStreaming() async {
+    func stopStream() async {
         guard let session = streamSession else { return }
         await session.stop()
-        
-        stateToken = nil
-        frameToken = nil
-        photoToken = nil
-        
         streamSession = nil
+        streamListeners.removeAll()  // Clear listener tokens
         isStreaming = false
+        latestFrameImage = nil
+        reconnectAttempts = 0  // Reset reconnect counter
+        isReconnecting = false
+        frameCount = 0
+
+        // Re-enable idle timer when not streaming
+        UIApplication.shared.isIdleTimerDisabled = false
+
+        // Deactivate audio session
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("[MWDAT] Audio session deactivation error: \(error)")
+        }
+    }
+
+    func resetReconnectAttempts() {
+        reconnectAttempts = 0
+        isReconnecting = false
     }
     
-    func capturePhoto() {
-        guard let session = streamSession else { return }
-        session.capturePhoto(format: .jpeg)
+    func handleCallback(url: URL) async {
+        guard let wearables = wearables else { return }
+
+        print("[MWDAT] Handling callback: \(url)")
+        do {
+            _ = try await wearables.handleUrl(url)
+        } catch {
+            print("[MWDAT] Callback error: \(error)")
+        }
     }
 }
 
+// MARK: - ContentView
 struct ContentView: View {
-    
-    @StateObject private var mgr = WearablesManager()
-    @StateObject private var stt = LiveSpeechTranscriber()
-    @StateObject private var tts = TextToSpeechPlayer()
+    @EnvironmentObject private var manager: WearablesManager
+    @State private var showHelp = false
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 12) {
-                
-                // MARK: - Meta Glasses Status
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Registration: \(mgr.registrationStateText)")
-                    Text("Devices: \(mgr.deviceCountText)")
-                    Text("Camera Permission: \(mgr.cameraPermissionText)")
-                    Text("Streaming: " + (mgr.isStreaming ? "YES" : "NO"))
-                    
-                    if let err = mgr.lastErrorText {
-                        Text(err)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Divider()
-                
-                // MARK: - Video Preview
-                Group {
-                    if let img = mgr.latestFrameImage {
-                        Image(uiImage: img)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: 360)
-                            .clipped()
-                    } else {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.gray.opacity(0.2))
-                            .frame(height: 240)
-                            .overlay(Text("No frame yet"))
-                    }
-                }
-                
-                Divider()
-                
-                // MARK: - MWDAT Controls
-                HStack(spacing: 10) {
-                    Button("Observe Streams") { mgr.startObservingWearablesStreams() }
-                    Button("Register") { mgr.startRegistration() }
-                    Button("Unregister") { mgr.startUnregistration() }
-                }
-                
-                HStack(spacing: 10) {
-                    Button("Check Cam Perm") { mgr.checkCameraPermission() }
-                    Button("Request Cam Perm") { mgr.requestCameraPermission() }
-                }
-                
-                HStack(spacing: 10) {
-                    Button("Start Stream") { Task { await mgr.startStreaming() } }
-                    Button("Stop Stream") { Task { await mgr.stopStreaming() } }
-                    Button("Photo") { mgr.capturePhoto() }
-                }
-                
-                if let photo = mgr.lastPhotoCaptured {
-                    Divider()
-                    Text("Last Photo")
-                    Image(uiImage: photo)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 140)
-                }
-                
-                // MARK: - Live Transcription Section
-                Divider()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Live Transcription")
-                        .font(.headline)
-                    
-                    Text("Status: \(stt.statusText)")
-                        .font(.subheadline)
-                    
-                    if !stt.lastErrorText.isEmpty {
-                        Text(stt.lastErrorText)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                    
-                    // Mic Input Meter
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Mic Input")
-                            .font(.subheadline)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Status Card
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Connection Status")
+                            .font(.headline)
                         
-                        ProgressView(value: Double(stt.inputLevel))
+                        StatusRow(title: "📱 Registration", value: manager.registrationState)
+                        StatusRow(title: "👓 Devices Found", value: manager.deviceCount)
+                        StatusRow(title: "📷 Camera Access", value: manager.cameraPermission)
+                        StatusRow(title: "🎥 Streaming", value: manager.isStreaming ? "Active" : "Inactive")
                         
-                        Text(String(format: "%.1f dB", stt.inputLevelDB))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if let error = manager.errorMessage {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                                .padding(8)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(8)
+                        }
                     }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
                     
-                    // Transcript Display
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.gray.opacity(0.12))
-                        .frame(height: 140)
-                        .overlay(
-                            ScrollView {
-                                Text(stt.transcript.isEmpty ? "(transcript will appear here…)" : stt.transcript)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(12)
+                    // Camera Feed
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Camera Feed")
+                            .font(.headline)
+
+                        if let image = manager.latestFrameImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 250)
+                                .cornerRadius(12)
+                        } else {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(.systemGray5))
+                                    .frame(height: 250)
+
+                                VStack(spacing: 12) {
+                                    if manager.isStreaming {
+                                        ProgressView()
+                                            .scaleEffect(1.5)
+                                        Text("Waiting for frames...")
+                                            .foregroundColor(.gray)
+                                        Text("Keep glasses awake")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    } else {
+                                        Image(systemName: "camera.viewfinder")
+                                            .font(.largeTitle)
+                                            .foregroundColor(.gray)
+                                        Text("No feed available")
+                                            .foregroundColor(.gray)
+                                        Text("Tap Start Stream")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
                             }
-                        )
-                    
-                    // Transcription Controls
-                    HStack(spacing: 10) {
-                        Button(stt.isRunning ? "Listening…" : "Start Mic STT") {
-                            Task { await stt.start() }
-                        }
-                        .disabled(stt.isRunning)
-                        
-                        Button("Stop") {
-                            stt.stop()
-                        }
-                        .disabled(!stt.isRunning)
-                        
-                        Button("Clear") {
-                            stt.transcript = ""
-                            stt.lastErrorText = ""
-                            stt.statusText = "idle"
                         }
                     }
                     
-                    Divider()
-                    
-                    // MARK: - Playback Controls
-                    Text("Playback (Meta glasses speakers)")
-                        .font(.headline)
-                    
-                    Text("Output route: \(tts.currentOutputRoute)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    if !tts.lastSpokenError.isEmpty {
-                        Text(tts.lastSpokenError)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                    
-                    HStack(spacing: 10) {
-                        Button(stt.isPlaybackPaused ? "Play" : "Pause") {
-                            stt.playPausePlayback()
+                    // Control Buttons
+                    VStack(spacing: 15) {
+                        // Registration Buttons
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Step 1: Registration")
+                                .font(.subheadline)
+                                .bold()
+                            
+                            HStack(spacing: 10) {
+                                Button(action: { manager.register() }) {
+                                    Label("Register with Meta", systemImage: "link")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(manager.registrationState.contains("registered"))
+                                
+                                Button(action: { manager.unregister() }) {
+                                    Label("Unregister", systemImage: "link.slash")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                            }
                         }
                         
-                        Button("Restart") {
-                            stt.restartPlayback()
-                        }
-                        
-                        Button("Stop Playback") {
-                            stt.stopPlayback()
+                        // Streaming Buttons
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Step 2: Streaming")
+                                .font(.subheadline)
+                                .bold()
+                            
+                            HStack(spacing: 10) {
+                                Button(action: {
+                                    Task {
+                                        manager.resetReconnectAttempts()
+                                        await manager.startStream()
+                                    }
+                                }) {
+                                    Label("Start Stream", systemImage: "play.circle")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(manager.isStreaming || manager.deviceCount == "0")
+                                
+                                Button(action: {
+                                    Task { await manager.stopStream() }
+                                }) {
+                                    Label("Stop Stream", systemImage: "stop.circle")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(!manager.isStreaming)
+                            }
                         }
                     }
+                    
+                    // Help Button
+                    Button(action: { showHelp = true }) {
+                        HStack {
+                            Image(systemName: "questionmark.circle")
+                            Text("Need Help?")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+                .padding()
             }
-            .padding()
-            .navigationTitle("MWDAT Stream")
+            .navigationTitle("Meta Glasses Stream")
+            .sheet(isPresented: $showHelp) {
+                HelpView()
+            }
         }
         .onOpenURL { url in
-            Task { await mgr.handleWearablesCallback(url: url) }
-        }
-        .onAppear {
-            Task { await stt.requestSpeechAuthorization() }
+            Task {
+                await manager.handleCallback(url: url)
+            }
         }
     }
+}
+
+struct StatusRow: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
+                .foregroundColor(colorForValue(value))
+        }
+        .padding(.vertical, 4)
+    }
+    
+    func colorForValue(_ value: String) -> Color {
+        let lower = value.lowercased()
+        if lower.contains("registered") || lower.contains("granted") || lower.contains("active") || Int(value) ?? 0 > 0 {
+            return .green
+        } else if lower.contains("error") || lower.contains("failed") {
+            return .red
+        } else {
+            return .primary
+        }
+    }
+}
+
+struct HelpView: View {
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Common Issues & Fixes") {
+                    HelpItem(
+                        icon: "exclamationmark.triangle",
+                        title: "Registration Drops Immediately",
+                        description: "This is normal! Wait 30 seconds after registration. The SDK often resets once before stabilizing."
+                    )
+                    
+                    HelpItem(
+                        icon: "eyeglasses",
+                        title: "Glasses Not Found",
+                        description: "1. Open Meta AI app\n2. Check glasses are connected (green dot)\n3. Enable Developer Mode in Meta AI Settings"
+                    )
+                    
+                    HelpItem(
+                        icon: "arrow.clockwise",
+                        title: "Reset Everything",
+                        description: "1. Close all apps\n2. Restart iPhone\n3. Restart glasses\n4. Open Meta AI → Pair glasses\n5. Try again"
+                    )
+                    
+                    HelpItem(
+                        icon: "gear",
+                        title: "Developer Mode Required",
+                        description: "In Meta AI app: Settings → Developer → Enable Developer Mode → Add your app's Bundle ID"
+                    )
+                }
+                
+                Section("Registration States Guide") {
+                    HelpItem(
+                        icon: "0.circle",
+                        title: "State 0: Unknown",
+                        description: "Initial state or error occurred"
+                    )
+                    
+                    HelpItem(
+                        icon: "1.circle",
+                        title: "State 1: Unregistered",
+                        description: "App is not registered with Meta"
+                    )
+                    
+                    HelpItem(
+                        icon: "2.circle",
+                        title: "State 2: Registering",
+                        description: "Registration in progress - wait"
+                    )
+                    
+                    HelpItem(
+                        icon: "3.circle.fill",
+                        title: "State 3: Registered ✅",
+                        description: "SUCCESS! App can now discover glasses"
+                    )
+                }
+            }
+            .navigationTitle("Troubleshooting Guide")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct HelpItem: View {
+    let icon: String
+    let title: String
+    let description: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(.blue)
+                    .frame(width: 30)
+                Text(title)
+                    .fontWeight(.medium)
+            }
+            Text(description)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.leading, 35)
+        }
+        .padding(.vertical, 5)
+    }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(WearablesManager())
 }

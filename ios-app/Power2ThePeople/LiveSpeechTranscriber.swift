@@ -45,7 +45,6 @@ final class LiveSpeechTranscriber: ObservableObject {
         
         let session = AVAudioSession.sharedInstance()
         do {
-            // Use .videoChat mode for voice processing + Bluetooth HFP mic support
             try session.setCategory(
                 .playAndRecord,
                 mode: .videoChat,
@@ -53,12 +52,10 @@ final class LiveSpeechTranscriber: ObservableObject {
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
             
-            // Prefer Bluetooth HFP mic (Meta glasses) if available
             if let btMic = session.availableInputs?.first(where: { $0.portType == .bluetoothHFP }) {
                 try session.setPreferredInput(btMic)
             }
             
-            // Max input gain if device supports it
             if session.isInputGainSettable {
                 try session.setInputGain(1.0)
             }
@@ -88,8 +85,6 @@ final class LiveSpeechTranscriber: ObservableObject {
             try audioEngine.start()
             isRunning = true
             statusText = "listening…"
-            
-            // Start level monitoring
             startLevelTimer()
             
         } catch {
@@ -99,7 +94,7 @@ final class LiveSpeechTranscriber: ObservableObject {
         }
         
         task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
-            guard let self else { return }
+            guard let self = self else { return }
             if let result = result {
                 Task { @MainActor in
                     self.transcript = result.bestTranscription.formattedString
@@ -112,7 +107,6 @@ final class LiveSpeechTranscriber: ObservableObject {
     }
     
     func stop() {
-        // Save transcript before stopping
         savedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         
         audioEngine.stop()
@@ -133,13 +127,13 @@ final class LiveSpeechTranscriber: ObservableObject {
     
     private func requestMicrophonePermission() async {
         if #available(iOS 17.0, *) {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            await withCheckedContinuation { continuation in
                 AVAudioApplication.requestRecordPermission { _ in
                     continuation.resume()
                 }
             }
         } else {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            await withCheckedContinuation { continuation in
                 AVAudioSession.sharedInstance().requestRecordPermission { _ in
                     continuation.resume()
                 }
@@ -153,19 +147,20 @@ final class LiveSpeechTranscriber: ObservableObject {
         let channelDataArray = stride(from: 0, to: Int(buffer.frameLength), by: buffer.stride).map { channelDataValue[$0] }
         
         let rms = sqrt(channelDataArray.map { $0 * $0 }.reduce(0, +) / Float(buffer.frameLength))
-        let avgPower = 20 * log10(rms)
+        let avgPower = rms > 0 ? 20 * log10(rms) : -160.0
         
         Task { @MainActor in
             self.inputLevelDB = avgPower
-            // Normalize -60dB to 0dB range to 0.0 to 1.0
             let normalized = (avgPower + 60.0) / 60.0
             self.inputLevel = max(0.0, min(1.0, normalized))
         }
     }
     
     private func startLevelTimer() {
+        // Timer is used to keep RunLoop active for audio level updates
         levelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            // Timer just ensures UI updates; actual level comes from updateInputLevel
+            // Level updates happen in updateInputLevel via audio tap callback
+            _ = self
         }
     }
     
