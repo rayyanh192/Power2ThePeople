@@ -17,14 +17,21 @@ final class LiveSpeechTranscriber: ObservableObject {
     
     @Published var isPlayingBack: Bool = false
     @Published var isPlaybackPaused: Bool = false
-    
+
     private let audioEngine = AVAudioEngine()
     private let recognizer = SFSpeechRecognizer()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private let speechSynth = AVSpeechSynthesizer()
-    
+
     private var levelTimer: Timer?
+    private var pauseTimer: Timer?
+
+    /// Called when user stops speaking for 1.5 seconds with the current transcript
+    var onPauseDetected: ((String) -> Void)?
+
+    /// Pause detection threshold in seconds
+    var pauseThreshold: TimeInterval = 1.5
     
     func requestSpeechAuthorization() async {
         await withCheckedContinuation { continuation in
@@ -103,6 +110,7 @@ final class LiveSpeechTranscriber: ObservableObject {
             if let result = result {
                 Task { @MainActor in
                     self.transcript = result.bestTranscription.formattedString
+                    self.resetPauseTimer()
                 }
             }
             // Do NOT call stop() on error - let user explicitly stop
@@ -133,6 +141,8 @@ final class LiveSpeechTranscriber: ObservableObject {
         
         levelTimer?.invalidate()
         levelTimer = nil
+        pauseTimer?.invalidate()
+        pauseTimer = nil
         inputLevel = 0.0
         inputLevelDB = -160.0
         
@@ -180,6 +190,19 @@ final class LiveSpeechTranscriber: ObservableObject {
         levelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             // Level updates happen in updateInputLevel via audio tap callback
             _ = self
+        }
+    }
+
+    /// Reset the pause detection timer - called whenever new speech is detected
+    private func resetPauseTimer() {
+        pauseTimer?.invalidate()
+        pauseTimer = Timer.scheduledTimer(withTimeInterval: pauseThreshold, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            let currentTranscript = self.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !currentTranscript.isEmpty {
+                print("[Speech] Pause detected after \(self.pauseThreshold)s - triggering callback")
+                self.onPauseDetected?(currentTranscript)
+            }
         }
     }
     

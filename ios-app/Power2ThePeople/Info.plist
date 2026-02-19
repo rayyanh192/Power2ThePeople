@@ -2,61 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.edrick.Power2ThePeople</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>power2thepeople</string>
-			</array>
-		</dict>
-	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>fb</string>
-		<string>fbapi</string>
-		<string>fbauth2</string>
-		<string>fb-messenger-share-api</string>
-		<string>fb-viewapp</string>
-	</array>
-	<key>MWDAT</key>
-	<dict>
-		<key>AppLinkURLScheme</key>
-		<string>power2thepeople://</string>
-		<key>MetaAppID</key>
-		<string>0</string>
-	</dict>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Needed to connect to Meta Ray-Ban glasses</string>
-	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Needed to connect to Meta Ray-Ban glasses</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Required to receive video stream from Meta glasses</string>
+	<string>Camera is used to capture the scene during a traffic stop for legal analysis.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Required for speech-to-text transcription</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Required to discover and connect to Meta glasses on your network</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_http._tcp</string>
-		<string>_meta._tcp</string>
-	</array>
+	<string>Microphone is used for speech-to-text transcription of conversations.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Required for live speech recognition</string>
+	<string>Speech recognition is used to transcribe conversations in real-time.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>100.100.41.85</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
-		<string>bluetooth-central</string>
-		<string>bluetooth-peripheral</string>
-		<string>external-accessory</string>
-		<string>fetch</string>
-		<string>processing</string>
-	</array>
-	<key>UISupportedExternalAccessoryProtocols</key>
-	<array>
-		<string>com.meta.ar.wearable</string>
 	</array>
 </dict>
 </plist>

@@ -1,0 +1,17 @@
+# Core dependencies
+ollama
+pandas
+requests
+beautifulsoup4
+numpy
+
+# ML dependencies
+torch
+sentence-transformers
+faiss-cpu
+transformers
+
+# API server
+fastapi
+uvicorn[standard]
+python-multipart
