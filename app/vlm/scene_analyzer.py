@@ -1,7 +1,7 @@
 import ollama
 
 class SceneAnalyzer:
-    def __init__(self, model="llava"):
+    def __init__(self, model="llava:7b"):
         self.model = model
         
     def analyze(self, image_path: str) -> str:
@@ -21,5 +21,5 @@ class SceneAnalyzer:
 
 if __name__ == "__main__":
     analyzer = SceneAnalyzer()
-    result = analyzer.analyze("/home/dell/traffic_stop.jpg")
+    result = analyzer.analyze("/Users/rayyan/Documents/GitHub/Power2ThePeople/app/vlm/policeimage.jpg")
     print(f"[VLM] {result}")

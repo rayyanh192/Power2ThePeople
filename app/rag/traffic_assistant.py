@@ -376,7 +376,7 @@ What should I know?</|user|>
 
 # TESTING
 if __name__ == "__main__":
-    assistant = TrafficStopAssistant("stopdata.csv")
+    assistant = TrafficStopAssistant("/Users/rayyan/Documents/GitHub/Power2ThePeople/app/rag/Data/stopdata.csv")
     
     print("="*80)
     print("TRAFFIC STOP ASSISTANT - TESTING")
