@@ -45,17 +45,19 @@ final class LiveSpeechTranscriber: ObservableObject {
         
         let session = AVAudioSession.sharedInstance()
         do {
+            // Use built-in mic only — no Bluetooth HFP so glasses mic is ignored
             try session.setCategory(
                 .playAndRecord,
-                mode: .videoChat,
-                options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
+                mode: .measurement,
+                options: [.duckOthers, .defaultToSpeaker, .allowBluetoothA2DP]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            
-            if let btMic = session.availableInputs?.first(where: { $0.portType == .bluetoothHFP }) {
-                try session.setPreferredInput(btMic)
+
+            // Explicitly route input to the iPhone's built-in microphone
+            if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                try session.setPreferredInput(builtInMic)
             }
-            
+
             if session.isInputGainSettable {
                 try session.setInputGain(1.0)
             }

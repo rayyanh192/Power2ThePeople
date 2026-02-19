@@ -3,7 +3,7 @@
 //  Power2ThePeople
 //
 //  Created by Edrick Chang on 1/24/26.
-//
+// 
 
 import SwiftUI
 import UIKit
@@ -425,159 +425,151 @@ struct ContentView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Collapsible Status Card
-                        VStack(alignment: .leading, spacing: 0) {
-                            Button(action: { withAnimation { isStatusExpanded.toggle() } }) {
-                                HStack {
-                                    Text("Connection Status")
-                                        .font(.headline)
-                                    Spacer()
-                                    Image(systemName: isStatusExpanded ? "chevron.up" : "chevron.down")
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .contentShape(Rectangle())
-                            }
-                            .foregroundColor(.primary)
-                            
-                            if isStatusExpanded {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    StatusRow(title: "📱 Registration", value: manager.registrationState)
-                                    StatusRow(title: "👓 Devices Found", value: manager.deviceCount)
-                                    StatusRow(title: "📷 Camera Access", value: manager.cameraPermission)
-                                    StatusRow(title: "🎥 Streaming", value: manager.isStreaming ? "Active" : "Inactive")
-                                    
-                                    if let error = manager.errorMessage {
-                                        Text(error)
-                                            .foregroundColor(.red)
-                                            .font(.caption)
-                                            .padding(8)
-                                            .background(Color.red.opacity(0.1))
-                                            .cornerRadius(8)
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    // Help Button in dropdown
-                                    Button(action: { showHelp = true }) {
-                                        HStack {
-                                            Image(systemName: "questionmark.circle")
-                                            Text("Need Help?")
-                                            Spacer()
-                                        }
-                                        .foregroundColor(.primary)
-                                    }
-                                    .padding(.top, 4)
-                                }
-                                .padding()
-                                .background(Color(.systemGray6))
-                            }
-                        }
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        
-                        // Camera Feed
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Camera Feed")
+                // Collapsible Status Card
+                VStack(alignment: .leading, spacing: 0) {
+                    Button(action: { withAnimation { isStatusExpanded.toggle() } }) {
+                        HStack {
+                            Text("Connection Status")
                                 .font(.headline)
-
-                            if let image = manager.latestFrameImage {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: 200)
-                                    .cornerRadius(12)
-                            } else {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(.systemGray5))
-                                        .frame(height: 200)
-
-                                    VStack(spacing: 12) {
-                                        if manager.isStreaming {
-                                            ProgressView()
-                                                .scaleEffect(1.5)
-                                            Text("Waiting for frames...")
-                                                .foregroundColor(.gray)
-                                            Text("Keep glasses awake")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        } else {
-                                            Image(systemName: "camera.viewfinder")
-                                                .font(.largeTitle)
-                                                .foregroundColor(.gray)
-                                            Text("No feed available")
-                                                .foregroundColor(.gray)
-                                            Text("Tap Start Stream")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                }
-                            }
+                            Spacer()
+                            Image(systemName: isStatusExpanded ? "chevron.up" : "chevron.down")
+                                .foregroundColor(.secondary)
                         }
-                        
-                        // Control Buttons
-                        VStack(spacing: 15) {
-                            // Registration Buttons
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Step 1: Registration")
-                                    .font(.subheadline)
-                                    .bold()
-                                
-                                HStack(spacing: 10) {
-                                    Button(action: { manager.register() }) {
-                                        Label("Register with Meta", systemImage: "link")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(manager.registrationState.contains("registered"))
-                                    
-                                    Button(action: { manager.unregister() }) {
-                                        Label("Unregister", systemImage: "link.slash")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.bordered)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundColor(.primary)
+
+                    if isStatusExpanded {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                StatusRow(title: "📱 Registration", value: manager.registrationState)
+                                StatusRow(title: "👓 Devices Found", value: manager.deviceCount)
+                                StatusRow(title: "📷 Camera Access", value: manager.cameraPermission)
+                                StatusRow(title: "🎥 Streaming", value: manager.isStreaming ? "Active" : "Inactive")
+
+                                if let error = manager.errorMessage {
+                                    Text(error)
+                                        .foregroundColor(.red)
+                                        .font(.caption)
+                                        .padding(8)
+                                        .background(Color.red.opacity(0.1))
+                                        .cornerRadius(8)
                                 }
-                            }
-                            
-                            // Streaming Buttons
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Step 2: Streaming")
-                                    .font(.subheadline)
-                                    .bold()
-                                
-                                HStack(spacing: 10) {
-                                    Button(action: {
-                                        Task {
-                                            manager.resetReconnectAttempts()
-                                            await manager.startStream()
+
+                                Divider()
+
+                                // Step 1: Registration Buttons
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Step 1: Registration")
+                                        .font(.subheadline)
+                                        .bold()
+
+                                    HStack(spacing: 10) {
+                                        Button(action: { manager.register() }) {
+                                            Label("Register with Meta", systemImage: "link")
+                                                .frame(maxWidth: .infinity)
                                         }
-                                    }) {
-                                        Label("Start Stream", systemImage: "play.circle")
-                                            .frame(maxWidth: .infinity)
+                                        .buttonStyle(.borderedProminent)
+                                        .disabled(manager.registrationState.contains("registered"))
+
+                                        Button(action: { manager.unregister() }) {
+                                            Label("Unregister", systemImage: "link.slash")
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.bordered)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(manager.isStreaming || manager.deviceCount == "0")
-                                    
-                                    Button(action: {
-                                        Task { await manager.stopStream() }
-                                    }) {
-                                        Label("Stop Stream", systemImage: "stop.circle")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .disabled(!manager.isStreaming)
                                 }
+
+                                // Step 2: Streaming Buttons
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Step 2: Streaming")
+                                        .font(.subheadline)
+                                        .bold()
+
+                                    HStack(spacing: 10) {
+                                        Button(action: {
+                                            Task {
+                                                manager.resetReconnectAttempts()
+                                                await manager.startStream()
+                                            }
+                                        }) {
+                                            Label("Start Stream", systemImage: "play.circle")
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .disabled(manager.isStreaming || manager.deviceCount == "0")
+
+                                        Button(action: {
+                                            Task { await manager.stopStream() }
+                                        }) {
+                                            Label("Stop Stream", systemImage: "stop.circle")
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .disabled(!manager.isStreaming)
+                                    }
+                                }
+
+                                Divider()
+
+                                // Help Button in dropdown
+                                Button(action: { showHelp = true }) {
+                                    HStack {
+                                        Image(systemName: "questionmark.circle")
+                                        Text("Need Help?")
+                                        Spacer()
+                                    }
+                                    .foregroundColor(.primary)
+                                }
+                                .padding(.top, 4)
+                            }
+                            .padding()
+                        }
+                        .frame(maxHeight: 320)
+                        .background(Color(.systemGray6))
+                    }
+                }
+                .background(Color(.systemGray6))
+
+                // Camera Feed — fills all remaining space
+                ZStack {
+                    Color.black
+
+                    if let image = manager.latestFrameImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                    } else {
+                        VStack(spacing: 12) {
+                            if manager.isStreaming {
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                                Text("Waiting for frames...")
+                                    .foregroundColor(.gray)
+                                Text("Keep glasses awake")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Image(systemName: "camera.viewfinder")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.gray)
+                                Text("No feed available")
+                                    .foregroundColor(.gray)
+                                Text("Open Connection Status to start")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
                     }
-                    .padding()
                 }
-                
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .padding(10)
+
                 Divider()
                 
                 // Audio Processing Section (Collapsible)
