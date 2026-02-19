@@ -195,7 +195,7 @@ class StopDataAnalyzer:
 
 
 class NemotronClient:
-    def __init__(self, model="nemotron:70b-fast", use_rag=True, data_dir="Data", index_path=None):
+    def __init__(self, model="nemotron-mini:4b", use_rag=True, data_dir="Data", index_path=None):
         self.model = model
         self.use_rag = use_rag
 
@@ -388,7 +388,7 @@ if __name__ == "__main__":
 
     # Analyze scene from traffic stop image
     print("\n" + "="*80)
-    image_path = "/home/dell/traffic_stop.jpg"
+    image_path = "/Users/rayyan/Documents/GitHub/Power2ThePeople/app/vlm/policeimage.jpg"
 
     if os.path.exists(image_path):
         print(f"🔍 Analyzing scene from image: {image_path}")
